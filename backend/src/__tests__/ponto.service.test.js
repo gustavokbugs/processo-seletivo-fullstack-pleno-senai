@@ -1,4 +1,25 @@
-const pontoService = require('../../modules/ponto/ponto.service');
+jest.mock('../utils/AppError', () => {
+  return class AppError extends Error {
+    constructor(message, statusCode) {
+      super(message);
+      this.statusCode = statusCode;
+      this.isOperational = true;
+    }
+  };
+});
+
+jest.mock('../modules/ponto/ponto.repository');
+jest.mock('../config/database', () => ({
+  colaborador: {
+    findUnique: jest.fn(),
+  },
+  registroPonto: {
+    findMany: jest.fn(),
+    create: jest.fn(),
+  },
+}));
+
+const pontoService = require('../modules/ponto/ponto.service');
 
 describe('PontoService', () => {
   describe('calcularDiferencaHoras', () => {

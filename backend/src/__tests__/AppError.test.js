@@ -1,4 +1,4 @@
-const AppError = require('../../utils/AppError');
+const AppError = require('../utils/AppError');
 
 describe('AppError', () => {
   it('deve criar erro com mensagem e status code', () => {
