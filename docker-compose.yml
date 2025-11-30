@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   # container para o postgres
-  postgres:
+  db:
     image: postgres:15-alpine
-    container_name: clockwork-postgres
+    container_name: clockwork-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: clockwork_user
-      POSTGRES_PASSWORD: clockwork_pass
-      POSTGRES_DB: clockwork_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: clockwork
       TZ: America/Sao_Paulo
     ports:
       - "5432:5432"
@@ -18,7 +18,7 @@ services:
     networks:
       - clockwork-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U clockwork_user -d clockwork_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d clockwork"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,27 +32,22 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      PORT: 3000
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: clockwork_user
-      DB_PASSWORD: clockwork_pass
-      DB_NAME: clockwork_db
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      JWT_EXPIRES_IN: 24h
+      PORT: 3001
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/clockwork?schema=public"
+      JWT_SECRET: fiesc_2024_super_secret_jwt_key_change_in_production
+      JWT_EXPIRES_IN: 8h
       TZ: America/Sao_Paulo
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - backend_logs:/app/logs
     networks:
       - clockwork-network
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
-    command: npm run dev
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm run dev"
 
   # container para o frontend (React/Vite)
   frontend:
@@ -62,7 +57,7 @@ services:
     container_name: clockwork-frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:3000
+      VITE_API_URL: http://localhost:3001
       NODE_ENV: development
       TZ: America/Sao_Paulo
     ports:
@@ -81,9 +76,6 @@ volumes:
   postgres_data:
     driver: local
     name: clockwork-postgres-data
-  backend_logs:
-    driver: local
-    name: clockwork-backend-logs
 
 # networks
 networks:

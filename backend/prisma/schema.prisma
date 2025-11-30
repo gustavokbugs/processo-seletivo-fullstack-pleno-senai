@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  usuario   String   @unique
+  senha     String
+  tipo      TipoUsuario
+  ativo     Boolean  @default(true)
+  colaborador Colaborador?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("usuarios")
+}
+
+enum TipoUsuario {
+  ADMINISTRADOR
+  COLABORADOR
+}
+
+model Colaborador {
+  id              Int      @id @default(autoincrement())
+  cpf             String   @unique
+  nome            String
+  email           String   @unique
+  cargoId         Int
+  funcaoId        Int
+  dataAdmissao    DateTime
+  dataRescisao    DateTime?
+  ativo           Boolean  @default(true)
+  usuarioId       Int      @unique
+  
+  cargo           Cargo    @relation(fields: [cargoId], references: [id])
+  funcao          Funcao   @relation(fields: [funcaoId], references: [id])
+  usuario         Usuario  @relation(fields: [usuarioId], references: [id])
+  quadroHorarios  QuadroHorario[]
+  registrosPonto  RegistroPonto[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("colaboradores")
+}
+
+model Cargo {
+  id           Int      @id @default(autoincrement())
+  nome         String   @unique
+  descricao    String?
+  colaboradores Colaborador[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("cargos")
+}
+
+model Funcao {
+  id           Int      @id @default(autoincrement())
+  nome         String   @unique
+  descricao    String?
+  colaboradores Colaborador[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("funcoes")
+}
+
+model QuadroHorario {
+  id              Int      @id @default(autoincrement())
+  colaboradorId   Int
+  diaSemana       DiaSemana
+  primeiraEntrada String   // HH:MM
+  primeiraSaida   String   // HH:MM
+  segundaEntrada  String   // HH:MM
+  segundaSaida    String   // HH:MM
+  totalHoras      Float    // total de horas do dia
+  
+  colaborador     Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([colaboradorId, diaSemana])
+  @@map("quadro_horarios")
+}
+
+enum DiaSemana {
+  SEGUNDA
+  TERCA
+  QUARTA
+  QUINTA
+  SEXTA
+  SABADO
+  DOMINGO
+}
+
+model Feriado {
+  id        Int      @id @default(autoincrement())
+  data      DateTime @unique
+  descricao String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("feriados")
+}
+
+model RegistroPonto {
+  id              Int      @id @default(autoincrement())
+  colaboradorId   Int
+  data            DateTime
+  horario         DateTime
+  latitude        Float
+  longitude       Float
+  tipoRegistro    TipoRegistro
+  observacao      String?  // pra armazenar alertas de TAC ou horas extras
+  
+  colaborador     Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("registros_ponto")
+}
+
+enum TipoRegistro {
+  ENTRADA
+  SAIDA
+}
