@@ -83,6 +83,18 @@ class ColaboradorService {
     this.validateNome(dadosColaborador.nome);
     this.validateEmail(dadosColaborador.email);
 
+    if (dadosColaborador.dataAdmissao && dadosColaborador.dataAdmissao !== '') {
+      dadosColaborador.dataAdmissao = new Date(dadosColaborador.dataAdmissao);
+    } else {
+      delete dadosColaborador.dataAdmissao;
+    }
+
+    if (dadosColaborador.dataRescisao && dadosColaborador.dataRescisao !== '') {
+      dadosColaborador.dataRescisao = new Date(dadosColaborador.dataRescisao);
+    } else {
+      delete dadosColaborador.dataRescisao;
+    }
+
     const cpfExiste = await colaboradorRepository.checkCpfExists(dadosColaborador.cpf);
     if (cpfExiste) {
       throw new AppError('CPF já cadastrado', 409);
@@ -100,6 +112,13 @@ class ColaboradorService {
       if (dataRescisao < dataAdmissao) {
         throw new AppError('Data de rescisão não pode ser anterior à data de admissão', 400);
       }
+    }
+
+    if (dadosColaborador.dataAdmissao === '' || dadosColaborador.dataAdmissao === null) {
+      delete dadosColaborador.dataAdmissao;
+    }
+    if (dadosColaborador.dataRescisao === '' || dadosColaborador.dataRescisao === null) {
+      delete dadosColaborador.dataRescisao;
     }
 
     dadosColaborador.ativo = !dadosColaborador.dataRescisao || 
@@ -182,18 +201,30 @@ class ColaboradorService {
       }
     }
 
+    if (dadosColaborador.dataAdmissao && dadosColaborador.dataAdmissao !== '') {
+      dadosColaborador.dataAdmissao = new Date(dadosColaborador.dataAdmissao);
+    } else if (dadosColaborador.dataAdmissao === '' || dadosColaborador.dataAdmissao === null) {
+      delete dadosColaborador.dataAdmissao;
+    }
+
+    if (dadosColaborador.dataRescisao && dadosColaborador.dataRescisao !== '') {
+      dadosColaborador.dataRescisao = new Date(dadosColaborador.dataRescisao);
+    } else if (dadosColaborador.dataRescisao === '' || dadosColaborador.dataRescisao === null) {
+      delete dadosColaborador.dataRescisao;
+    }
+
     if (dadosColaborador.dataRescisao) {
       const dataAdmissao = dadosColaborador.dataAdmissao || colaboradorExiste.dataAdmissao;
-      const dataRescisao = new Date(dadosColaborador.dataRescisao);
       
-      if (dataRescisao < new Date(dataAdmissao)) {
+      if (dadosColaborador.dataRescisao < dataAdmissao) {
         throw new AppError('Data de rescisão não pode ser anterior à data de admissão', 400);
       }
     }
 
-    if ('dataRescisao' in dadosColaborador) {
-      dadosColaborador.ativo = !dadosColaborador.dataRescisao || 
-                                new Date(dadosColaborador.dataRescisao) > new Date();
+    if (dadosColaborador.dataRescisao) {
+      dadosColaborador.ativo = dadosColaborador.dataRescisao > new Date();
+    } else if ('dataRescisao' in dadosColaborador) {
+      dadosColaborador.ativo = true;
     }
 
     delete dadosColaborador.cpf;
