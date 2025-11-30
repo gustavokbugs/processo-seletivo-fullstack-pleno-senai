@@ -1,4 +1,22 @@
-const colaboradorService = require('../../modules/colaboradores/colaborador.service');
+jest.mock('../utils/AppError', () => {
+  return class AppError extends Error {
+    constructor(message, statusCode) {
+      super(message);
+      this.statusCode = statusCode;
+      this.isOperational = true;
+    }
+  };
+});
+
+jest.mock('../modules/colaboradores/colaborador.repository');
+jest.mock('../modules/usuarios/usuario.repository');
+jest.mock('../config/database', () => ({
+  colaborador: {
+    findUnique: jest.fn(),
+  },
+}));
+
+const colaboradorService = require('../modules/colaboradores/colaborador.service');
 
 describe('ColaboradorService', () => {
   describe('validateNome', () => {
