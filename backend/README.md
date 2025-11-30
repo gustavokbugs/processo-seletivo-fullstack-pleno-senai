@@ -1,4 +1,4 @@
-# Backend - Clock Work Register
+# Backend - Registro de Ponto
 
 Backend para sistema de registro de ponto desenvolvido com Node.js, Express e Prisma.
 

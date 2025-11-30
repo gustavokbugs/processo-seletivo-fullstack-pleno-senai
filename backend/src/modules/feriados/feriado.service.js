@@ -17,6 +17,10 @@ class FeriadoService {
   }
 
   async createFeriado(data) {
+    if (!data.data || data.data === '' || data.data === null) {
+      throw new AppError('Data do feriado é obrigatória', 400);
+    }
+
     const dataExiste = await feriadoRepository.checkDataExists(data.data);
     if (dataExiste) {
       throw new AppError('Já existe um feriado cadastrado para esta data', 409);
