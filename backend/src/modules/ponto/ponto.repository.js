@@ -21,10 +21,12 @@ class PontoRepository {
   }
 
   async findByColaboradorAndDate(colaboradorId, data) {
-    const inicioDia = new Date(data);
+    const dataObj = typeof data === 'string' ? new Date(data) : new Date(data);
+    
+    const inicioDia = new Date(dataObj);
     inicioDia.setHours(0, 0, 0, 0);
     
-    const fimDia = new Date(data);
+    const fimDia = new Date(dataObj);
     fimDia.setHours(23, 59, 59, 999);
 
     return await prisma.registroPonto.findMany({
@@ -33,6 +35,21 @@ class PontoRepository {
         data: {
           gte: inicioDia,
           lte: fimDia
+        }
+      },
+      orderBy: {
+        horario: 'asc'
+      }
+    });
+  }
+
+  async findByColaboradorAndDateRange(colaboradorId, dataInicio, dataFim) {
+    return await prisma.registroPonto.findMany({
+      where: {
+        colaboradorId: parseInt(colaboradorId),
+        data: {
+          gte: dataInicio,
+          lte: dataFim
         }
       },
       orderBy: {

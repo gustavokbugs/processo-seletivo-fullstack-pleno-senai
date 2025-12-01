@@ -12,6 +12,7 @@ const RegistroPonto = () => {
   const [warning, setWarning] = useState('');
   const [registros, setRegistros] = useState([]);
   const [location, setLocation] = useState(null);
+  const [address, setAddress] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -29,23 +30,55 @@ const RegistroPonto = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setLocation({
+          const coords = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
-          });
+          };
+          setLocation(coords);
+          getReverseGeocode(coords.latitude, coords.longitude);
         },
         (error) => {
           console.error('Erro ao obter localização:', error);
-          setLocation({
+          const fallbackCoords = {
             latitude: -27.5954,
             longitude: -48.5480
-          });
+          };
+          setLocation(fallbackCoords);
+          getReverseGeocode(fallbackCoords.latitude, fallbackCoords.longitude);
         }
       );
     } else {
-      setLocation({
+      const fallbackCoords = {
         latitude: -27.5954,
         longitude: -48.5480
+      };
+      setLocation(fallbackCoords);
+      getReverseGeocode(fallbackCoords.latitude, fallbackCoords.longitude);
+    }
+  };
+
+  const getReverseGeocode = async (lat, lon) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
+      );
+      const data = await response.json();
+      
+      if (data.address) {
+        setAddress({
+          rua: data.address.road || data.address.street || 'Não identificada',
+          bairro: data.address.suburb || data.address.neighbourhood || data.address.quarter || 'Não identificado',
+          cidade: data.address.city || data.address.town || data.address.village || 'Não identificada',
+          estado: data.address.state || '',
+          pais: data.address.country || ''
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao obter endereço:', error);
+      setAddress({
+        rua: 'Não foi possível obter',
+        bairro: 'Não foi possível obter',
+        cidade: 'Não foi possível obter'
       });
     }
   };
@@ -54,7 +87,12 @@ const RegistroPonto = () => {
     try {
       const hoje = new Date().toISOString().split('T')[0];
       const data = await pontoService.getMeusRegistros(hoje);
-      setRegistros(data || []);
+      
+      if (Array.isArray(data)) {
+        setRegistros(data);
+      } else {
+        setRegistros([]);
+      }
     } catch (err) {
       console.error('Erro ao carregar registros:', err);
       setRegistros([]);
@@ -87,7 +125,12 @@ const RegistroPonto = () => {
         setWarning(response.warnings.join('\n'));
       }
 
-      await loadRegistrosHoje();
+      // Atualizar registros com o retorno do backend
+      if (response.registros && Array.isArray(response.registros)) {
+        setRegistros(response.registros);
+      } else {
+        await loadRegistrosHoje();
+      }
       
     } catch (err) {
       setError(err.message || 'Erro ao registrar ponto');
@@ -120,8 +163,8 @@ const RegistroPonto = () => {
     });
   };
 
-  const entradas = registros.filter(r => r.tipo === 'ENTRADA');
-  const saidas = registros.filter(r => r.tipo === 'SAIDA');
+  const entradas = registros.filter(r => r.tipoRegistro === 'ENTRADA');
+  const saidas = registros.filter(r => r.tipoRegistro === 'SAIDA');
 
   if (!user?.colaboradorId) {
     return (
@@ -207,9 +250,24 @@ const RegistroPonto = () => {
             <MapPin className="w-5 h-5 text-primary-600" />
             <h2 className="text-lg font-semibold text-gray-900">Localização Atual</h2>
           </div>
-          <div className="text-sm text-gray-600">
-            <p>Latitude: {location.latitude.toFixed(6)}</p>
-            <p>Longitude: {location.longitude.toFixed(6)}</p>
+          <div className="space-y-2 text-sm text-gray-600">
+            {address ? (
+              <>
+                <p><strong>Rua:</strong> {address.rua}</p>
+                <p><strong>Bairro:</strong> {address.bairro}</p>
+                <p><strong>Cidade:</strong> {address.cidade}{address.estado && ` - ${address.estado}`}</p>
+                <div className="pt-2 mt-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-500">
+                    <strong>Coordenadas:</strong> {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                <span>Obtendo endereço...</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -236,7 +294,7 @@ const RegistroPonto = () => {
                     {index + 1}ª Entrada
                   </span>
                   <span className="text-lg font-bold text-green-700 font-mono">
-                    {formatRegistroTime(registro.dataHora)}
+                    {formatRegistroTime(registro.horario)}
                   </span>
                 </div>
               ))}
@@ -265,7 +323,7 @@ const RegistroPonto = () => {
                     {index + 1}ª Saída
                   </span>
                   <span className="text-lg font-bold text-red-700 font-mono">
-                    {formatRegistroTime(registro.dataHora)}
+                    {formatRegistroTime(registro.horario)}
                   </span>
                 </div>
               ))}

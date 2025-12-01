@@ -122,7 +122,7 @@ class ColaboradorService {
     }
 
     dadosColaborador.ativo = !dadosColaborador.dataRescisao || 
-                              new Date(dadosColaborador.dataRescisao) > new Date();
+                              dadosColaborador.dataRescisao > new Date();
 
     if (quadroHorarios && quadroHorarios.length > 0) {
       const totalSemanal = this.calculateTotalHorasSemanais(quadroHorarios);
@@ -173,7 +173,28 @@ class ColaboradorService {
         });
       }
 
-      return colaborador;
+      const colaboradorCompleto = await tx.colaborador.findUnique({
+        where: { id: colaborador.id },
+        include: {
+          cargo: true,
+          funcao: true,
+          usuario: {
+            select: {
+              id: true,
+              usuario: true,
+              tipo: true,
+              ativo: true
+            }
+          },
+          quadroHorarios: {
+            orderBy: {
+              diaSemana: 'asc'
+            }
+          }
+        }
+      });
+
+      return colaboradorCompleto;
     });
 
     return resultado;
@@ -221,10 +242,9 @@ class ColaboradorService {
       }
     }
 
-    if (dadosColaborador.dataRescisao) {
-      dadosColaborador.ativo = dadosColaborador.dataRescisao > new Date();
-    } else if ('dataRescisao' in dadosColaborador) {
-      dadosColaborador.ativo = true;
+    if ('dataRescisao' in dadosColaborador) {
+      dadosColaborador.ativo = !dadosColaborador.dataRescisao || 
+                                dadosColaborador.dataRescisao > new Date();
     }
 
     delete dadosColaborador.cpf;
@@ -276,7 +296,28 @@ class ColaboradorService {
         }
       }
 
-      return colaborador;
+      const colaboradorCompleto = await tx.colaborador.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          cargo: true,
+          funcao: true,
+          usuario: {
+            select: {
+              id: true,
+              usuario: true,
+              tipo: true,
+              ativo: true
+            }
+          },
+          quadroHorarios: {
+            orderBy: {
+              diaSemana: 'asc'
+            }
+          }
+        }
+      });
+
+      return colaboradorCompleto;
     });
 
     return resultado;

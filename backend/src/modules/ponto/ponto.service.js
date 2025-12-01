@@ -52,32 +52,42 @@ class PontoService {
     }
 
     const ultimoRegistro = await pontoRepository.getLastRegistro(colaboradorId);
-
     const alertas = [];
 
-    if (ultimoRegistro && ultimoRegistro.tipoRegistro === 'SAIDA') {
-      const diferenciaHoras = this.calcularDiferencaHoras(ultimoRegistro.horario, hoje);
-      if (diferenciaHoras < 11) {
-        alertas.push('TAC: Intervalo entre jornadas menor que 11 horas');
-      }
-    }
-
-    if (tipoRegistro === 'ENTRADA' && registrosHoje.length === 1) {
-      const primeiraEntrada = registrosHoje[0];
-      if (primeiraEntrada.tipoRegistro === 'SAIDA') {
-        const diferenciaHoras = this.calcularDiferencaHoras(primeiraEntrada.horario, hoje);
-        if (diferenciaHoras < 1) {
-          alertas.push('TAC: Intervalo intrajornada menor que 1 hora');
+    if (tipoRegistro === 'ENTRADA' && registrosHoje.length === 0 && ultimoRegistro) {
+      const ultimaSaida = ultimoRegistro.tipoRegistro === 'SAIDA' ? ultimoRegistro : null;
+      
+      if (ultimaSaida) {
+        const diferenciaHoras = this.calcularDiferencaHoras(ultimaSaida.horario, hoje);
+        if (diferenciaHoras < 11) {
+          throw new AppError(
+            `Não é permitido registrar entrada com intervalo menor que 11 horas desde a última saída (${diferenciaHoras.toFixed(1)}h)`,
+            400
+          );
         }
       }
     }
 
-    if (tipoRegistro === 'SAIDA' && registrosHoje.length >= 3) {
+    if (tipoRegistro === 'ENTRADA' && registrosHoje.length >= 1) {
+      const primeiraSaida = registrosHoje.find(r => r.tipoRegistro === 'SAIDA');
+      
+      if (primeiraSaida) {
+        const diferenciaHoras = this.calcularDiferencaHoras(primeiraSaida.horario, hoje);
+        if (diferenciaHoras < 1) {
+          throw new AppError(
+            `Não é permitido registrar entrada com intervalo menor que 1 hora desde a última saída (${Math.round(diferenciaHoras * 60)} minutos)`,
+            400
+          );
+        }
+      }
+    }
+
+    if (tipoRegistro === 'SAIDA' && registrosHoje.length >= 1) {
       const registrosComAtual = [...registrosHoje, { horario: hoje, tipoRegistro: 'SAIDA' }];
       const horasTrabalhadas = this.calcularHorasTrabalhadas(registrosComAtual);
 
       if (horasTrabalhadas > 10) {
-        alertas.push('TAC: Jornada de trabalho maior que 10 horas');
+        alertas.push(`TAC: Jornada de trabalho maior que 10 horas (${horasTrabalhadas.toFixed(2)}h)`);
       }
 
       const diasSemana = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
@@ -90,6 +100,44 @@ class PontoService {
         if (horasTrabalhadas > horasEsperadas) {
           alertas.push(`Horas extras: Trabalhou ${horasTrabalhadas.toFixed(2)}h de ${horasEsperadas}h esperadas`);
         }
+      }
+    }
+
+    if (tipoRegistro === 'SAIDA') {
+      const inicioSemana = new Date(hoje);
+      inicioSemana.setDate(hoje.getDate() - hoje.getDay());
+      inicioSemana.setHours(0, 0, 0, 0);
+      
+      const fimSemana = new Date(inicioSemana);
+      fimSemana.setDate(inicioSemana.getDate() + 6);
+      fimSemana.setHours(23, 59, 59, 999);
+
+      const registrosSemana = await pontoRepository.findByColaboradorAndDateRange(
+        colaboradorId,
+        inicioSemana,
+        fimSemana
+      );
+
+      const todosRegistros = [...registrosSemana, { horario: hoje, tipoRegistro: 'SAIDA' }];
+      
+      let totalHorasSemana = 0;
+      const registrosPorDia = {};
+      
+      todosRegistros.forEach(reg => {
+        const dia = new Date(reg.horario).toISOString().split('T')[0];
+        if (!registrosPorDia[dia]) registrosPorDia[dia] = [];
+        registrosPorDia[dia].push(reg);
+      });
+
+      Object.values(registrosPorDia).forEach(registrosDia => {
+        totalHorasSemana += this.calcularHorasTrabalhadas(registrosDia);
+      });
+
+      if (totalHorasSemana > 44) {
+        throw new AppError(
+          `Não é permitido registrar saída: total de horas semanais excederia 44 horas (${totalHorasSemana.toFixed(2)}h)`,
+          400
+        );
       }
     }
 

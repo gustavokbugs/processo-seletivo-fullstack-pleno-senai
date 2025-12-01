@@ -15,6 +15,15 @@ const ColaboradorForm = () => {
   const [funcoes, setFuncoes] = useState([]);
   const [cpfBlocked, setCpfBlocked] = useState(false);
   const [generatedUsername, setGeneratedUsername] = useState('');
+  const [quadroHorarios, setQuadroHorarios] = useState([
+    { diaSemana: 'SEGUNDA', primeiraEntrada: '', primeiraSaida: '', segundaEntrada: '', segundaSaida: '', totalHoras: 0 },
+    { diaSemana: 'TERCA', primeiraEntrada: '', primeiraSaida: '', segundaEntrada: '', segundaSaida: '', totalHoras: 0 },
+    { diaSemana: 'QUARTA', primeiraEntrada: '', primeiraSaida: '', segundaEntrada: '', segundaSaida: '', totalHoras: 0 },
+    { diaSemana: 'QUINTA', primeiraEntrada: '', primeiraSaida: '', segundaEntrada: '', segundaSaida: '', totalHoras: 0 },
+    { diaSemana: 'SEXTA', primeiraEntrada: '', primeiraSaida: '', segundaEntrada: '', segundaSaida: '', totalHoras: 0 },
+    { diaSemana: 'SABADO', primeiraEntrada: '', primeiraSaida: '', segundaEntrada: '', segundaSaida: '', totalHoras: 0 },
+    { diaSemana: 'DOMINGO', primeiraEntrada: '', primeiraSaida: '', segundaEntrada: '', segundaSaida: '', totalHoras: 0 }
+  ]);
 
   const [formData, setFormData] = useState({
     cpf: '',
@@ -65,6 +74,14 @@ const ColaboradorForm = () => {
       if (data.usuario) {
         setGeneratedUsername(data.usuario.usuario);
       }
+      
+      if (data.quadroHorarios && data.quadroHorarios.length > 0) {
+        const horarios = quadroHorarios.map(dia => {
+          const horarioExistente = data.quadroHorarios.find(h => h.diaSemana === dia.diaSemana);
+          return horarioExistente || dia;
+        });
+        setQuadroHorarios(horarios);
+      }
     } catch (err) {
       setError(err.message || 'Erro ao carregar colaborador');
     } finally {
@@ -114,9 +131,15 @@ const ColaboradorForm = () => {
       finalValue = formatCpf(value);
     }
     
+    let ativoCalculado = formData.ativo;
+    if (name === 'dataRescisao') {
+      ativoCalculado = !value || new Date(value) > new Date();
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : finalValue
+      [name]: type === 'checkbox' ? checked : finalValue,
+      ...(name === 'dataRescisao' && { ativo: ativoCalculado })
     }));
 
     if (name === 'nome' && value.includes(' ')) {
@@ -153,6 +176,92 @@ const ColaboradorForm = () => {
       const username = `${parts[0].toLowerCase()}_${parts[parts.length - 1].toLowerCase()}`;
       setGeneratedUsername(username);
     }
+  };
+
+  const timeToMinutes = (time) => {
+    if (!time) return 0;
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const calculateTotalHoras = (primeiraEntrada, primeiraSaida, segundaEntrada, segundaSaida) => {
+    let total = 0;
+    
+    if (primeiraEntrada && primeiraSaida) {
+      const entrada1 = timeToMinutes(primeiraEntrada);
+      const saida1 = timeToMinutes(primeiraSaida);
+      total += (saida1 - entrada1) / 60;
+    }
+    
+    if (segundaEntrada && segundaSaida) {
+      const entrada2 = timeToMinutes(segundaEntrada);
+      const saida2 = timeToMinutes(segundaSaida);
+      total += (saida2 - entrada2) / 60;
+    }
+    
+    return Math.max(0, total);
+  };
+
+  const validateHorarios = (dia, campo, valor) => {
+    const entrada1 = campo === 'primeiraEntrada' ? timeToMinutes(valor) : timeToMinutes(dia.primeiraEntrada);
+    const saida1 = campo === 'primeiraSaida' ? timeToMinutes(valor) : timeToMinutes(dia.primeiraSaida);
+    const entrada2 = campo === 'segundaEntrada' ? timeToMinutes(valor) : timeToMinutes(dia.segundaEntrada);
+    const saida2 = campo === 'segundaSaida' ? timeToMinutes(valor) : timeToMinutes(dia.segundaSaida);
+
+    if (campo === 'primeiraEntrada' && dia.primeiraSaida && entrada1 >= saida1) {
+      return 'Primeira entrada não pode ser maior ou igual à primeira saída';
+    }
+
+    if (campo === 'primeiraSaida' && dia.primeiraEntrada && saida1 <= entrada1) {
+      return 'Primeira saída não pode ser menor ou igual à primeira entrada';
+    }
+
+    if (campo === 'segundaEntrada' && dia.primeiraSaida) {
+      const intervalo = (entrada2 - saida1) / 60;
+      if (intervalo < 1) {
+        return 'Intervalo entre primeira saída e segunda entrada deve ser de no mínimo 1 hora';
+      }
+    }
+
+    if (campo === 'primeiraSaida' && dia.segundaEntrada) {
+      const intervalo = (entrada2 - saida1) / 60;
+      if (intervalo < 1) {
+        return 'Intervalo entre primeira saída e segunda entrada deve ser de no mínimo 1 hora';
+      }
+    }
+
+    if (campo === 'segundaEntrada' && dia.segundaSaida && entrada2 >= saida2) {
+      return 'Segunda entrada não pode ser maior ou igual à segunda saída';
+    }
+
+    if (campo === 'segundaSaida' && dia.segundaEntrada && saida2 <= entrada2) {
+      return 'Segunda saída não pode ser menor ou igual à segunda entrada';
+    }
+
+    return '';
+  };
+
+  const handleHorarioChange = (index, campo, valor) => {
+    const novosHorarios = [...quadroHorarios];
+    const dia = novosHorarios[index];
+    
+    const erro = validateHorarios(dia, campo, valor);
+    if (erro) {
+      setError(erro);
+      return;
+    }
+    
+    setError('');
+    dia[campo] = valor;
+    
+    dia.totalHoras = calculateTotalHoras(
+      dia.primeiraEntrada,
+      dia.primeiraSaida,
+      dia.segundaEntrada,
+      dia.segundaSaida
+    );
+    
+    setQuadroHorarios(novosHorarios);
   };
 
   const handleCpfBlur = async () => {
@@ -201,6 +310,12 @@ const ColaboradorForm = () => {
       }
     }
 
+    const totalHorasSemana = quadroHorarios.reduce((total, dia) => total + dia.totalHoras, 0);
+    if (totalHorasSemana > 44) {
+      setError(`Total de horas semanais não pode exceder 44 horas (atual: ${totalHorasSemana.toFixed(2)}h)`);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -208,10 +323,12 @@ const ColaboradorForm = () => {
         ...formData,
         cpf: formData.cpf.replace(/\D/g, ''),
         cargoId: parseInt(formData.cargoId),
-        funcaoId: parseInt(formData.funcaoId)
+        funcaoId: parseInt(formData.funcaoId),
+        quadroHorarios: quadroHorarios.filter(dia => 
+          dia.primeiraEntrada && dia.primeiraSaida
+        )
       };
 
-      // Remove campos de data vazios (strings vazias devem ser undefined ou não enviadas)
       if (!dataToSend.dataAdmissao || dataToSend.dataAdmissao === '') {
         delete dataToSend.dataAdmissao;
       }
@@ -425,8 +542,104 @@ const ColaboradorForm = () => {
             disabled
           />
           <label htmlFor="ativo" className="text-sm font-medium text-gray-700">
-            Ativo?
+            Ativo? 
+            <span className="text-xs text-gray-500 ml-2">
+              (calculado automaticamente: marcado se sem data de rescisão ou rescisão futura)
+            </span>
           </label>
+        </div>
+
+        <div className="border-t pt-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Quadro de Horários</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Defina os horários de trabalho para cada dia da semana. Deixe em branco os dias sem expediente.
+          </p>
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Dia da Semana
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    1ª Entrada
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    1ª Saída
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    2ª Entrada
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    2ª Saída
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total Horas
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {quadroHorarios.map((dia, index) => (
+                  <tr key={dia.diaSemana}>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {dia.diaSemana}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <input
+                        type="time"
+                        value={dia.primeiraEntrada}
+                        onChange={(e) => handleHorarioChange(index, 'primeiraEntrada', e.target.value)}
+                        className="input-field text-sm"
+                        disabled={cpfBlocked && !isEdit}
+                      />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <input
+                        type="time"
+                        value={dia.primeiraSaida}
+                        onChange={(e) => handleHorarioChange(index, 'primeiraSaida', e.target.value)}
+                        className="input-field text-sm"
+                        disabled={cpfBlocked && !isEdit}
+                      />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <input
+                        type="time"
+                        value={dia.segundaEntrada}
+                        onChange={(e) => handleHorarioChange(index, 'segundaEntrada', e.target.value)}
+                        className="input-field text-sm"
+                        disabled={cpfBlocked && !isEdit}
+                      />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <input
+                        type="time"
+                        value={dia.segundaSaida}
+                        onChange={(e) => handleHorarioChange(index, 'segundaSaida', e.target.value)}
+                        className="input-field text-sm"
+                        disabled={cpfBlocked && !isEdit}
+                      />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      {dia.totalHoras.toFixed(2)}h
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-gray-50">
+                  <td colSpan="5" className="px-4 py-3 text-right text-sm font-bold text-gray-900">
+                    Total Semanal:
+                  </td>
+                  <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                    {quadroHorarios.reduce((total, dia) => total + dia.totalHoras, 0).toFixed(2)}h
+                    {quadroHorarios.reduce((total, dia) => total + dia.totalHoras, 0) > 44 && (
+                      <span className="ml-2 text-red-600 text-xs">(Excede 44h)</span>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="flex gap-4 pt-4 border-t">
