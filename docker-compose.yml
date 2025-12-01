@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # container para o postgres
   db:
     image: postgres:15-alpine
     container_name: clockwork-db
@@ -23,7 +22,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # container para o backend (Node.js)
   backend:
     build:
       context: ./backend
@@ -47,9 +45,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm run dev"
 
-  # container para o frontend (React)
   frontend:
     build:
       context: ./frontend
@@ -62,15 +58,11 @@ services:
       - clockwork-network
     depends_on:
       - backend
-    command: npm run dev -- --host
 
-# Volumes persistentes
 volumes:
   postgres_data:
-    driver: local
     name: clockwork-postgres-data
 
-# networks
 networks:
   clockwork-network:
     driver: bridge

@@ -104,19 +104,6 @@ const Login = () => {
             )}
           </button>
         </form>
-
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <div className="text-center text-sm text-gray-600 space-y-2">
-            <p className="font-semibold text-gray-700">Credenciais de Acesso:</p>
-            <p>
-              <span className="font-medium">Admin:</span> admin / 12345678
-            </p>
-            <p className="text-xs text-gray-500 mt-3">
-              Colaboradores são criados pelo admin e<br />
-              recebem senha padrão: 12345678
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );

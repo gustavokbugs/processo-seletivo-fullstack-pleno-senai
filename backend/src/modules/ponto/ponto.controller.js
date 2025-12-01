@@ -21,9 +21,14 @@ class PontoController {
       longitude: parseFloat(longitude)
     });
 
+    const registros = await pontoService.getRegistrosHoje(usuario.colaborador.id);
+
     res.status(201).json({
       status: 'success',
-      data: result
+      data: {
+        registros,
+        warnings: result.alertas || []
+      }
     });
   });
 
